@@ -1,0 +1,1 @@
+alertFunc('Hello world!')
