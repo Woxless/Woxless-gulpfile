@@ -1,1 +1,0 @@
-alertFunc('Hello world!')

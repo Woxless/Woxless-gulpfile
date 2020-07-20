@@ -1,76 +1,93 @@
 const gulp = require('gulp');
 
-const autoprefix = require('gulp-autoprefixer');
+const live = require('gulp-connect');
 const concat = require('gulp-concat');
-const cssstrip = require('gulp-strip-css-comments')
-const minimize = require('gulp-cssmin');
-const imgmin = require('gulp-imagemin');
-const inject = require('gulp-inject');
+const autoprefix = require('gulp-autoprefixer');
+const cssmin = require('gulp-cssmin');
+const stripcommentcss = require('gulp-strip-css-comments');
 
-const useref = require('gulp-useref');
-const babel = require('gulp-babel');
+const imagemin = require('gulp-imagemin');
 const uglify = require('gulp-uglify');
-const connect = require('gulp-connect');
+const babel = require('gulp-babel');
+const htmlmin = require('gulp-htmlmin');
+const useref = require('gulp-useref');
 
 const sass = require('gulp-sass');
 sass.compiler = require('node-sass');
 
-function server() {
-    connect.server({
+const path = {
+    html: './src/index',
+    styles: './src/styles/**/*',
+    scripts: './src/scripts/**/*',
+    images: './src/images/**/*'
+};
+
+gulp.task('liveserver', () => {
+    live.server({
         root: './build',
-        port: 9999,
+        port: 8080,
         livereload: true
-    })
-}
+    });
+});
 
-function htmls() {
-    return gulp.src('./*.html')
-        .pipe(useref())
-        .pipe(gulp.dest('./build'))
-        .pipe(connect.reload());
-}
-
-function styles() {
-    return gulp.src('./src/sass/**/*.scss')
-        .pipe(sass().on('error', sass.logError))
-        .pipe(cssstrip())
-        .pipe(autoprefix())
-        .pipe(minimize())
+gulp.task('css', () => {
+    return gulp.src(path.styles + '.css')
         .pipe(concat('styles.css'))
-        .pipe(gulp.dest('./build/css'))
-        .pipe(connect.reload());
-};
-
-function images() {
-    return gulp.src('./src/img/**/*')
-        .pipe(imgmin())
-        .pipe(gulp.dest('./build/img'))
-};
-
-function javascripts() {
-    return gulp.src('./src/js/**/*.js')
-        .pipe(concat('scripts.js'))
-        .pipe(babel({
-            presets: ['@babel/preset-env']
+        .pipe(autoprefix({
+            grid: true,
+            cascade: false
         }))
+        .pipe(stripcommentcss())
+        .pipe(cssmin())
+        .pipe(gulp.dest('./build/styles'))
+        .pipe(live.reload());
+});
+
+gulp.task('scss', () => {
+    return gulp.src(path.styles + '.scss')
+        .pipe(sass().on('error', sass.logError))
+        .pipe(concat('styles.css'))
+        .pipe(autoprefix({
+            grid: true,
+            cascade: false
+        }))
+        .pipe(stripcommentcss())
+        .pipe(cssmin())
+        .pipe(gulp.dest('./build/styles'))
+        .pipe(live.reload())
+        .pipe(gulp.dest('./build/styles'))
+        .pipe(live.reload());
+});
+
+gulp.task('img', () => {
+    return gulp.src(path.images)
+        .pipe(imagemin())
+        .pipe(gulp.dest('./build/images'));
+});
+
+gulp.task('scripts', () => {
+    return gulp.src(path.scripts + '.js')
+        .pipe(concat('scripts.js'))
+        .pipe(babel({presets: ['@babel/preset-env']}))
         .pipe(uglify())
-        .pipe(gulp.dest('./build/js'))
-        .pipe(connect.reload());
-}
+        .pipe(gulp.dest('./build/scripts'))
+        .pipe(live.reload());
+});
 
-function watcher() {
-    gulp.watch('./src/sass/**/*.scss', gulp.series('styles'));
-    gulp.watch('./src/img/**/*', gulp.series('images'));
-    gulp.watch('./src/js/**/*.js', gulp.series('javascripts'));
-    gulp.watch('./*.html', gulp.series('htmls'));
-};
+gulp.task('html', () => {
+    return gulp.src(path.html + '.html')
+        .pipe(useref())
+        .pipe(htmlmin({ collapseWhitespace: true }))
+        .pipe(gulp.dest('./build'))
+        .pipe(live.reload());
+});
 
-gulp.task('server', server);
-gulp.task('watcher', watcher);
+gulp.task('liveserver:watch', () => {
+    gulp.watch(path.html + '.html', gulp.series('html'));
+    gulp.watch(path.styles + '.css', gulp.series('css'));
+    gulp.watch(path.styles + '.scss', gulp.series('scss'));
+    gulp.watch(path.scripts + '.js', gulp.series('scripts'));
+    gulp.watch(path.images, gulp.series('img'));
+});
 
-gulp.task('htmls', htmls);
-gulp.task('styles', styles);
-gulp.task('images', images);
-gulp.task('javascripts', javascripts);
-
-gulp.task('default', gulp.parallel('htmls', 'styles', 'images', 'javascripts', 'server', 'watcher'));
+gulp.task('default', gulp.parallel('liveserver', 'liveserver:watch'));
